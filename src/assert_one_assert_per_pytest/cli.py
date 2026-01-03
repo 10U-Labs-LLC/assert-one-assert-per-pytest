@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import glob
-import json
 import os
 import sys
 from dataclasses import dataclass
@@ -65,11 +64,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--count",
         action="store_true",
         help="Output only the count of findings.",
-    )
-    output_group.add_argument(
-        "--json",
-        action="store_true",
-        help="Output findings as JSON array.",
     )
     output_group.add_argument(
         "--verbose",
@@ -287,19 +281,15 @@ def process_files(
 def output_findings(
     findings: list[Finding],
     count_mode: bool = False,
-    json_mode: bool = False,
 ) -> None:
     """Output findings in the requested format.
 
     Args:
         findings: List of findings to output.
         count_mode: If True, output only the count.
-        json_mode: If True, output as JSON.
     """
     if count_mode:
         print(len(findings))
-    elif json_mode:
-        print(json.dumps([f.to_dict() for f in findings]))
     else:
         for finding in findings:
             print(finding)
@@ -373,7 +363,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         if result.had_error:
             print("Errors occurred during scanning.")
     elif not args.quiet:
-        output_findings(result.findings, args.count, args.json)
+        output_findings(result.findings, args.count)
 
     # Exit with appropriate code
     sys.exit(determine_exit_code(result, args.warn_only))

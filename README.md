@@ -37,9 +37,6 @@ assert-one-assert-per-pytest tests/ --exclude "**/conftest.py,**/fixtures/*"
 # Verbose output
 assert-one-assert-per-pytest tests/ --verbose
 
-# JSON output
-assert-one-assert-per-pytest tests/ --json
-
 # Count only
 assert-one-assert-per-pytest tests/ --count
 
@@ -77,19 +74,6 @@ path/to/test_file.py:25:test_another:3
 
 Format: `file_path:line_number:function_name:assert_count`
 
-### JSON Output
-
-```json
-[
-  {
-    "path": "path/to/test_file.py",
-    "line_number": 10,
-    "function_name": "test_example",
-    "assert_count": 0
-  }
-]
-```
-
 ## Exit Codes
 
 - `0`: No findings (or `--warn-only` specified)
@@ -111,7 +95,6 @@ This tool counts Python `assert` statements at the immediate level of test funct
 | `--exclude PATTERNS` | Comma-separated glob patterns to exclude |
 | `--quiet` | Suppress all output (exit code only) |
 | `--count` | Output only the count of findings |
-| `--json` | Output findings as JSON |
 | `--verbose` | Show detailed processing information |
 | `--fail-fast` | Exit after first finding |
 | `--warn-only` | Always exit 0, even with findings |

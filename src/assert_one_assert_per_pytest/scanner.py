@@ -23,15 +23,6 @@ class Finding:
         """Format as path:line:function:count."""
         return f"{self.path}:{self.line_number}:{self.function_name}:{self.assert_count}"
 
-    def to_dict(self) -> dict[str, str | int]:
-        """Convert to dictionary for JSON output."""
-        return {
-            "path": self.path,
-            "line_number": self.line_number,
-            "function_name": self.function_name,
-            "assert_count": self.assert_count,
-        }
-
 
 class AssertCounter(ast.NodeVisitor):
     """AST visitor that counts assert statements in a function body.

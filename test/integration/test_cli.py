@@ -118,28 +118,6 @@ def test_also_no_asserts():
         _, stdout, _ = run_cli([str(path), "--count"])
         assert stdout.strip() == "2"
 
-    def test_json_output(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
-    ) -> None:
-        """--json outputs valid JSON."""
-        import json
-
-        path = test_file(
-            """
-def test_no_asserts():
-    pass
-""",
-            "test_example.py",
-        )
-        _, stdout, _ = run_cli([str(path), "--json"])
-        data = json.loads(stdout)
-        assert isinstance(data, list)
-        assert len(data) == 1
-        assert data[0]["function_name"] == "test_no_asserts"
-        assert data[0]["assert_count"] == 0
-
     def test_quiet_no_output(
         self,
         run_cli: Callable[[list[str]], tuple[int, str, str]],

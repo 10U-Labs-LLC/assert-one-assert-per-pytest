@@ -44,11 +44,6 @@ class TestCreateParser:
         args = parser.parse_args(["tests/", "--count"])
         assert args.count is True
 
-    def test_json_flag(self) -> None:
-        parser = create_parser()
-        args = parser.parse_args(["tests/", "--json"])
-        assert args.json is True
-
     def test_verbose_flag(self) -> None:
         parser = create_parser()
         args = parser.parse_args(["tests/", "--verbose"])

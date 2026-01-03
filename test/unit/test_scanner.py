@@ -220,20 +220,6 @@ class TestFinding:
         )
         assert str(finding) == "test_example.py:10:test_something:0"
 
-    def test_to_dict(self) -> None:
-        finding = Finding(
-            path="test_example.py",
-            line_number=10,
-            function_name="test_something",
-            assert_count=2,
-        )
-        assert finding.to_dict() == {
-            "path": "test_example.py",
-            "line_number": 10,
-            "function_name": "test_something",
-            "assert_count": 2,
-        }
-
     def test_frozen(self) -> None:
         finding = Finding(
             path="test_example.py",
