@@ -1,0 +1,55 @@
+name: Assert One Assert Per Pytest
+description: "Assert that each pytest test function contains exactly one assert statement"
+
+inputs:
+  files:
+    description: "Files, directories, or glob patterns to scan (space-separated)"
+    required: true
+  exclude:
+    description: "Comma-separated glob patterns to exclude"
+    required: false
+    default: ""
+  verbose:
+    description: "Show detailed processing information"
+    required: false
+    default: "false"
+  fail-fast:
+    description: "Exit immediately after finding the first issue"
+    required: false
+    default: "false"
+  warn-only:
+    description: "Always exit with code 0, even if findings exist"
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Install assert-one-assert-per-pytest
+      run: python3 -m pip install assert-one-assert-per-pytest
+      shell: bash
+
+    - name: Run assertion check
+      run: |
+        ARGS=""
+
+        # Add optional flags
+        [ "${{ inputs.verbose }}" = "true" ] && ARGS="$ARGS --verbose"
+        [ "${{ inputs.fail-fast }}" = "true" ] && ARGS="$ARGS --fail-fast"
+        [ "${{ inputs.warn-only }}" = "true" ] && ARGS="$ARGS --warn-only"
+
+        # Add exclude patterns
+        if [ -n "${{ inputs.exclude }}" ]; then
+          ARGS="$ARGS --exclude '${{ inputs.exclude }}'"
+        fi
+
+        # Disable glob expansion to pass patterns to the CLI
+        set -f
+        FILES=""
+        for pattern in ${{ inputs.files }}; do
+          FILES="$FILES '$pattern'"
+        done
+        set +f
+
+        eval "assert-one-assert-per-pytest $ARGS $FILES"
+      shell: bash
