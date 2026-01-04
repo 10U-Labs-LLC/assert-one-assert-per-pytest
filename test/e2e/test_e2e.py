@@ -350,6 +350,57 @@ def test_example():
         result = run_cli(str(test_file))
         assert result.returncode == 0
 
+    def test_pytest_raises_counts_as_assertion(self, tmp_path: Path) -> None:
+        """pytest.raises() context manager counts as an assertion."""
+        test_file = tmp_path / "test_raises.py"
+        test_file.write_text(
+            """
+import pytest
+
+def test_raises_exception():
+    with pytest.raises(ValueError):
+        raise ValueError("expected")
+"""
+        )
+        result = run_cli(str(test_file))
+        assert result.returncode == 0
+
+    def test_pytest_warns_counts_as_assertion(self, tmp_path: Path) -> None:
+        """pytest.warns() context manager counts as an assertion."""
+        test_file = tmp_path / "test_warns.py"
+        test_file.write_text(
+            """
+import pytest
+import warnings
+
+def test_warns_user():
+    with pytest.warns(UserWarning):
+        warnings.warn("expected", UserWarning)
+"""
+        )
+        result = run_cli(str(test_file))
+        assert result.returncode == 0
+
+    def test_pytest_raises_plus_assert_counted_separately(
+        self, tmp_path: Path
+    ) -> None:
+        """pytest.raises() plus assert statement counts as two assertions."""
+        test_file = tmp_path / "test_two.py"
+        test_file.write_text(
+            """
+import pytest
+
+def test_two_assertions():
+    with pytest.raises(ValueError):
+        raise ValueError("expected")
+    assert True
+"""
+        )
+        result = run_cli(str(test_file))
+        assert result.returncode == 1
+        assert "test_two_assertions" in result.stdout
+        assert ":2" in result.stdout
+
 
 @pytest.mark.e2e
 class TestEdgeCases:

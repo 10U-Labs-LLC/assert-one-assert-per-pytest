@@ -472,6 +472,85 @@ def test_only():
         assert len(results) == 1
         assert results[0][0] == "test_a"
 
+    def test_pytest_raises_counts_as_assertion(
+        self,
+        run_cli: Callable[[list[str]], tuple[int, str, str]],
+        test_file: Callable[[str, str], Path],
+    ) -> None:
+        """pytest.raises() context manager counts as an assertion."""
+        path = test_file(
+            """
+import pytest
+
+def test_raises_exception():
+    with pytest.raises(ValueError):
+        raise ValueError("expected")
+""",
+            "test_raises.py",
+        )
+        exit_code, _, _ = run_cli([str(path)])
+        assert exit_code == 0
+
+    def test_pytest_warns_counts_as_assertion(
+        self,
+        run_cli: Callable[[list[str]], tuple[int, str, str]],
+        test_file: Callable[[str, str], Path],
+    ) -> None:
+        """pytest.warns() context manager counts as an assertion."""
+        path = test_file(
+            """
+import pytest
+
+def test_warns_user():
+    with pytest.warns(UserWarning):
+        import warnings
+        warnings.warn("expected", UserWarning)
+""",
+            "test_warns.py",
+        )
+        exit_code, _, _ = run_cli([str(path)])
+        assert exit_code == 0
+
+    def test_pytest_raises_plus_assert_is_two_assertions(
+        self,
+        run_cli: Callable[[list[str]], tuple[int, str, str]],
+        test_file: Callable[[str, str], Path],
+    ) -> None:
+        """pytest.raises() plus assert statement counts as two assertions."""
+        path = test_file(
+            """
+import pytest
+
+def test_two_assertions():
+    with pytest.raises(ValueError):
+        raise ValueError("expected")
+    assert True
+""",
+            "test_two.py",
+        )
+        exit_code, stdout, _ = run_cli([str(path)])
+        assert exit_code == 1
+        assert "test_two_assertions" in stdout
+        assert ":2" in stdout
+
+    def test_non_pytest_context_manager_not_counted(
+        self,
+        run_cli: Callable[[list[str]], tuple[int, str, str]],
+        test_file: Callable[[str, str], Path],
+    ) -> None:
+        """Non-pytest context managers don't count as assertions."""
+        path = test_file(
+            """
+def test_with_open():
+    with open(__file__) as f:
+        pass
+    assert True
+""",
+            "test_open.py",
+        )
+        exit_code, _, _ = run_cli([str(path)])
+        assert exit_code == 0
+
 
 @pytest.mark.integration
 class TestMainModuleAndEdgeCases:
