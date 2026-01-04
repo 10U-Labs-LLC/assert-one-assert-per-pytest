@@ -25,11 +25,27 @@ class Finding:
         return f"{self.path}:{self.line_number}:{self.function_name}:{self.assert_count}"
 
 
+def _is_pytest_assertion_context(node: ast.With) -> bool:
+    """Check if a with statement uses pytest.raises or pytest.warns."""
+    for item in node.items:
+        ctx = item.context_expr
+        if isinstance(ctx, ast.Call):
+            func = ctx.func
+            # Check for pytest.raises(...) or pytest.warns(...)
+            if isinstance(func, ast.Attribute):
+                if func.attr in ("raises", "warns"):
+                    if isinstance(func.value, ast.Name) and func.value.id == "pytest":
+                        return True
+    return False
+
+
 class AssertCounter(ast.NodeVisitor):
     """AST visitor that counts assert statements in a function body.
 
     Only counts asserts at the immediate level of the function, not in nested
     functions or classes defined within the test.
+
+    Also counts pytest.raises() and pytest.warns() context managers as assertions.
     """
 
     def __init__(self) -> None:
@@ -38,6 +54,8 @@ class AssertCounter(ast.NodeVisitor):
     def generic_visit(self, node: ast.AST) -> None:
         """Visit nodes and count asserts, skipping nested scopes."""
         if isinstance(node, ast.Assert):
+            self.count += 1
+        elif isinstance(node, ast.With) and _is_pytest_assertion_context(node):
             self.count += 1
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             # Don't descend into nested functions or classes

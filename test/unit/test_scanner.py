@@ -133,6 +133,82 @@ def test_example():
         assert isinstance(func, ast.FunctionDef)
         assert count_asserts(func) == 1
 
+    def test_counts_pytest_raises_as_assertion(self) -> None:
+        """Verify pytest.raises() context manager counts as an assertion."""
+        code = """
+def test_example():
+    with pytest.raises(ValueError):
+        raise ValueError("test")
+"""
+        tree = ast.parse(code)
+        func = tree.body[0]
+        assert isinstance(func, ast.FunctionDef)
+        assert count_asserts(func) == 1
+
+    def test_counts_pytest_warns_as_assertion(self) -> None:
+        """Verify pytest.warns() context manager counts as an assertion."""
+        code = """
+def test_example():
+    with pytest.warns(UserWarning):
+        warnings.warn("test", UserWarning)
+"""
+        tree = ast.parse(code)
+        func = tree.body[0]
+        assert isinstance(func, ast.FunctionDef)
+        assert count_asserts(func) == 1
+
+    def test_counts_pytest_raises_with_assert(self) -> None:
+        """Verify pytest.raises() plus assert counts as two assertions."""
+        code = """
+def test_example():
+    with pytest.raises(ValueError):
+        raise ValueError("test")
+    assert True
+"""
+        tree = ast.parse(code)
+        func = tree.body[0]
+        assert isinstance(func, ast.FunctionDef)
+        assert count_asserts(func) == 2
+
+    def test_ignores_non_pytest_with_statements(self) -> None:
+        """Verify non-pytest with statements don't count as assertions."""
+        code = """
+def test_example():
+    with open("file.txt") as f:
+        pass
+    assert True
+"""
+        tree = ast.parse(code)
+        func = tree.body[0]
+        assert isinstance(func, ast.FunctionDef)
+        assert count_asserts(func) == 1
+
+    def test_ignores_raises_without_pytest_prefix(self) -> None:
+        """Verify raises() without pytest prefix doesn't count as assertion."""
+        code = """
+def test_example():
+    with raises(ValueError):
+        raise ValueError("test")
+    assert True
+"""
+        tree = ast.parse(code)
+        func = tree.body[0]
+        assert isinstance(func, ast.FunctionDef)
+        assert count_asserts(func) == 1
+
+    def test_ignores_other_pytest_context_managers(self) -> None:
+        """Verify other pytest context managers don't count as assertions."""
+        code = """
+def test_example():
+    with pytest.deprecated_call():
+        pass
+    assert True
+"""
+        tree = ast.parse(code)
+        func = tree.body[0]
+        assert isinstance(func, ast.FunctionDef)
+        assert count_asserts(func) == 1
+
 
 @pytest.mark.unit
 class TestScanFile:
