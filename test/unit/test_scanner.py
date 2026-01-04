@@ -243,7 +243,7 @@ class TestFinding:
             assert_count=0,
         )
         with pytest.raises(AttributeError):
-            finding.path = "other.py"  # type: ignore[misc]
+            setattr(finding, "path", "other.py")
 
 
 @pytest.mark.unit
