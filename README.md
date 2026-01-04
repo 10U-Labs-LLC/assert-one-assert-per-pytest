@@ -1,15 +1,18 @@
 # assert-one-assert-per-pytest
 
-A CLI tool to assert that each pytest test function contains exactly one assert statement.
+Assert that each pytest test function contains exactly one assert.
 
 ## Why One Assert Per Test?
 
-The "one assert per test" pattern encourages writing focused, atomic tests that verify a single behavior. Benefits include:
+The "one assert per test" pattern encourages writing focused,
+atomic tests that verify a single behavior. Benefits include:
 
-- **Clear failure messages**: When a test fails, you know exactly what behavior broke
+- **Clear failure messages**: When a test fails, you know exactly
+  what behavior broke
 - **Better test names**: Tests naturally describe specific behaviors
-- **Easier maintenance**: Changes to one behavior don't affect unrelated assertions
-- **Faster debugging**: No need to hunt through multiple assertions to find the failure
+- **Easier maintenance**: Changes to one behavior don't affect
+  unrelated assertions
+- **Faster debugging**: No need to hunt through multiple assertions
 
 ## Installation
 
@@ -32,13 +35,10 @@ assert-one-assert-per-pytest tests/
 assert-one-assert-per-pytest "tests/**/test_*.py"
 
 # Exclude patterns
-assert-one-assert-per-pytest tests/ --exclude "**/conftest.py,**/fixtures/*"
+assert-one-assert-per-pytest tests/ --exclude "**/conftest.py"
 
 # Verbose output
 assert-one-assert-per-pytest tests/ --verbose
-
-# Count only
-assert-one-assert-per-pytest tests/ --count
 
 # Fail fast (exit on first finding)
 assert-one-assert-per-pytest tests/ --fail-fast
@@ -67,7 +67,7 @@ python -m assert_one_assert_per_pytest tests/
 
 Default output shows one finding per line:
 
-```
+```text
 path/to/test_file.py:10:test_example:0
 path/to/test_file.py:25:test_another:3
 ```
@@ -82,7 +82,8 @@ Format: `file_path:line_number:function_name:assert_count`
 
 ## What Counts as an Assert?
 
-This tool counts Python `assert` statements at the immediate level of test functions. It does **not** count:
+This tool counts Python `assert` statements at the immediate level
+of test functions. It does **not** count:
 
 - Assertions in nested functions or classes
 - `pytest.raises` or `pytest.warns` context managers
@@ -90,14 +91,13 @@ This tool counts Python `assert` statements at the immediate level of test funct
 
 ## Options
 
-| Option | Description |
-|--------|-------------|
-| `--exclude PATTERNS` | Comma-separated glob patterns to exclude |
-| `--quiet` | Suppress all output (exit code only) |
-| `--count` | Output only the count of findings |
-| `--verbose` | Show detailed processing information |
-| `--fail-fast` | Exit after first finding |
-| `--warn-only` | Always exit 0, even with findings |
+| Option                | Description                                |
+| --------------------- | ------------------------------------------ |
+| `--exclude PATTERNS`  | Glob patterns to exclude (comma-separated) |
+| `--quiet`             | Suppress all output (exit code only)       |
+| `--verbose`           | Show detailed processing information       |
+| `--fail-fast`         | Exit after first finding                   |
+| `--warn-only`         | Always exit 0, even with findings          |
 
 ## License
 

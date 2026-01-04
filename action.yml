@@ -1,55 +1,48 @@
-name: Assert One Assert Per Pytest
-description: "Assert that each pytest test function contains exactly one assert statement"
-
+---
+description: Assert each pytest test function contains exactly one assert
 inputs:
-  files:
-    description: "Files, directories, or glob patterns to scan (space-separated)"
-    required: true
   exclude:
-    description: "Comma-separated glob patterns to exclude"
+    description: Glob patterns to exclude files (comma-separated)
     required: false
-    default: ""
-  verbose:
-    description: "Show detailed processing information"
-    required: false
-    default: "false"
   fail-fast:
-    description: "Exit immediately after finding the first issue"
-    required: false
     default: "false"
+    description: Exit on first finding
+    required: false
+  files:
+    description: Target files to check (space-separated)
+    required: true
+  quiet:
+    default: "false"
+    description: Suppress output, exit code only
+    required: false
+  verbose:
+    default: "false"
+    description: Show files scanned/skipped, findings, and summary
+    required: false
   warn-only:
-    description: "Always exit with code 0, even if findings exist"
-    required: false
     default: "false"
-
+    description: Always exit 0, report only
+    required: false
+name: Assert One Assert Per Pytest
 runs:
-  using: composite
   steps:
-    - name: Install assert-one-assert-per-pytest
-      run: python3 -m pip install assert-one-assert-per-pytest
+    - run: python3 -m pip install assert-one-assert-per-pytest
       shell: bash
-
-    - name: Run assertion check
-      run: |
+    - run: |
         ARGS=""
-
-        # Add optional flags
+        [ "${{ inputs.quiet }}" = "true" ] && ARGS="$ARGS --quiet"
         [ "${{ inputs.verbose }}" = "true" ] && ARGS="$ARGS --verbose"
         [ "${{ inputs.fail-fast }}" = "true" ] && ARGS="$ARGS --fail-fast"
         [ "${{ inputs.warn-only }}" = "true" ] && ARGS="$ARGS --warn-only"
-
-        # Add exclude patterns
         if [ -n "${{ inputs.exclude }}" ]; then
           ARGS="$ARGS --exclude '${{ inputs.exclude }}'"
         fi
-
-        # Disable glob expansion to pass patterns to the CLI
         set -f
         FILES=""
         for pattern in ${{ inputs.files }}; do
           FILES="$FILES '$pattern'"
         done
         set +f
-
         eval "assert-one-assert-per-pytest $ARGS $FILES"
       shell: bash
+  using: composite

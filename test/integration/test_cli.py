@@ -236,8 +236,23 @@ def test_b():
 """
         )
 
+        exit_code, _, _ = run_cli([str(tmp_path), "--fail-fast"])
+        assert exit_code == 1
+
+    def test_returns_exit_code_1(
+        self,
+        run_cli: Callable[[list[str]], tuple[int, str, str]],
+        tmp_path: Path,
+    ) -> None:
+        """--fail-fast returns exit code 1 on finding."""
+        (tmp_path / "test_single.py").write_text(
+            """
+def test_single():
+    pass
+"""
+        )
+
         exit_code, stdout, _ = run_cli([str(tmp_path), "--fail-fast"])
         assert exit_code == 1
-        # Should only show one finding
         lines = [line for line in stdout.strip().split("\n") if line]
         assert len(lines) == 1

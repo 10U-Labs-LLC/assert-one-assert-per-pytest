@@ -50,6 +50,7 @@ def run_cli() -> Callable[[list[str]], tuple[int, str, str]]:
             [sys.executable, "-m", "assert_one_assert_per_pytest", *args],
             capture_output=True,
             text=True,
+            check=False,
         )
         return result.returncode, result.stdout, result.stderr
 
