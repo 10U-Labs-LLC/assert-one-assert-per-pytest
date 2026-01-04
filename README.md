@@ -83,10 +83,14 @@ Format: `file_path:line_number:function_name:assert_count`
 ## What Counts as an Assert?
 
 This tool counts Python `assert` statements at the immediate level
-of test functions. It does **not** count:
+of test functions. It also counts:
+
+- `pytest.raises()` context managers
+- `pytest.warns()` context managers
+
+It does **not** count:
 
 - Assertions in nested functions or classes
-- `pytest.raises` or `pytest.warns` context managers
 - Helper assertions in fixtures or utility functions
 
 ## Options
