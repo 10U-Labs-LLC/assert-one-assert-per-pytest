@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import io
 import subprocess
 import sys
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import patch
-
 import pytest
 
 from assert_one_assert_per_pytest.cli import main
@@ -23,22 +23,34 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "e2e: end-to-end tests")
 
 
-def run_main_with_args(args: list[str]) -> int:
-    """Run main() with given args and return exit code.
+@pytest.fixture
+def run_cli() -> Callable[[list[str]], tuple[int, str, str]]:
+    """Fixture providing in-process CLI runner for coverage tracking.
 
-    Shared utility for CLI tests across unit, integration, and e2e test suites.
+    Returns:
+        A function that runs the CLI with given arguments and returns
+        (exit_code, stdout, stderr).
     """
-    with patch("sys.argv", ["assert-one-assert-per-pytest", *args]):
-        try:
-            main()
-            return 0
-        except SystemExit as e:
-            return int(e.code) if e.code is not None else 0
+
+    def runner(args: list[str]) -> tuple[int, str, str]:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        exit_code = 0
+
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            try:
+                main(args)
+            except SystemExit as e:
+                exit_code = int(e.code) if e.code is not None else 0
+
+        return exit_code, stdout.getvalue(), stderr.getvalue()
+
+    return runner
 
 
 @pytest.fixture
-def run_cli() -> Callable[[list[str]], tuple[int, str, str]]:
-    """Fixture providing subprocess-based CLI runner.
+def run_cli_subprocess() -> Callable[[list[str]], tuple[int, str, str]]:
+    """Fixture providing subprocess-based CLI runner for e2e tests.
 
     Returns:
         A function that runs the CLI with given arguments and returns
