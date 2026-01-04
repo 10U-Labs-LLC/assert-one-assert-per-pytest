@@ -35,21 +35,15 @@ class AssertCounter(ast.NodeVisitor):
     def __init__(self) -> None:
         self.count = 0
 
-    # pylint: disable=invalid-name
-    def visit_Assert(self, _node: ast.Assert) -> None:
-        """Count an assert statement."""
-        self.count += 1
-        # Don't call generic_visit - we just want to count this node
-
-    def visit_FunctionDef(self, _node: ast.FunctionDef) -> None:
-        """Don't descend into nested functions."""
-
-    def visit_AsyncFunctionDef(self, _node: ast.AsyncFunctionDef) -> None:
-        """Don't descend into nested async functions."""
-
-    def visit_ClassDef(self, _node: ast.ClassDef) -> None:
-        """Don't descend into nested classes."""
-    # pylint: enable=invalid-name
+    def generic_visit(self, node: ast.AST) -> None:
+        """Visit nodes and count asserts, skipping nested scopes."""
+        if isinstance(node, ast.Assert):
+            self.count += 1
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            # Don't descend into nested functions or classes
+            return
+        else:
+            super().generic_visit(node)
 
 
 def count_asserts(function_node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
@@ -100,22 +94,11 @@ class TestFunctionFinder(ast.NodeVisitor):
                 )
             )
 
-    # pylint: disable=invalid-name
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        """Visit a function definition."""
-        self._check_function(node)
-        # Continue visiting to find nested test functions (rare but possible)
-        self.generic_visit(node)
-
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        """Visit an async function definition."""
-        self._check_function(node)
-        self.generic_visit(node)
-
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
-        """Visit a class definition to find test methods."""
-        self.generic_visit(node)
-    # pylint: enable=invalid-name
+    def generic_visit(self, node: ast.AST) -> None:
+        """Visit nodes to find test functions."""
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            self._check_function(node)
+        super().generic_visit(node)
 
 
 def scan_file(path: str, content: str) -> list[Finding]:
