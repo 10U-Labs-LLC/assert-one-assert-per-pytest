@@ -367,7 +367,3 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     # Exit with appropriate code
     sys.exit(determine_exit_code(result, args.warn_only))
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()
