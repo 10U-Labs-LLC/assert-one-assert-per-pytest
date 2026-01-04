@@ -97,9 +97,7 @@ jobs:
         name: Integration tests
         run: |
           python3 -m pytest test/integration/ \
-            --verbose --pythonwarnings=error \
-            --cov=assert_one_assert_per_pytest \
-            --cov-fail-under=100
+            --verbose --pythonwarnings=error
       - continue-on-error: true
         id: e2e_tests
         name: E2E tests

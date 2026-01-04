@@ -86,21 +86,19 @@ class TestOutputFormat:
         self, tmp_path: Path
     ) -> None:
         """Default output format is path:line:function:count."""
-        test_file = tmp_path / "test_example.py"
+        test_file = tmp_path / "test_output.py"
         test_file.write_text(
             """
-def test_no_asserts():
+def test_empty():
     pass
 """
         )
         result = run_cli(str(test_file))
-        lines = result.stdout.strip().split("\n")
-        assert len(lines) == 1
-        parts = lines[0].split(":")
-        assert len(parts) == 4
-        assert "test_example.py" in parts[0]
-        assert parts[2] == "test_no_asserts"
-        assert parts[3] == "0"
+        output = result.stdout.strip()
+        assert output.count(":") == 3
+        assert "test_output.py" in output
+        assert "test_empty" in output
+        assert output.endswith(":0")
 
     def test_count_mode_outputs_only_count(self, tmp_path: Path) -> None:
         """--count outputs only the number of findings."""

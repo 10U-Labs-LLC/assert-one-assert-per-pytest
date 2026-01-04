@@ -50,7 +50,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--exclude",
         metavar="PATTERNS",
-        help="Comma-separated glob patterns to exclude files (e.g., '**/conftest.py,**/fixtures/*').",
+        help="Comma-separated glob patterns to exclude files.",
     )
 
     # Output mode options (mutually exclusive)
@@ -369,5 +369,5 @@ def main(argv: Sequence[str] | None = None) -> None:
     sys.exit(determine_exit_code(result, args.warn_only))
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

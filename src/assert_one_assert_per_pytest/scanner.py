@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -34,22 +35,21 @@ class AssertCounter(ast.NodeVisitor):
     def __init__(self) -> None:
         self.count = 0
 
-    def visit_Assert(self, node: ast.Assert) -> None:
+    # pylint: disable=invalid-name
+    def visit_Assert(self, _node: ast.Assert) -> None:
         """Count an assert statement."""
         self.count += 1
         # Don't call generic_visit - we just want to count this node
 
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+    def visit_FunctionDef(self, _node: ast.FunctionDef) -> None:
         """Don't descend into nested functions."""
-        pass
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+    def visit_AsyncFunctionDef(self, _node: ast.AsyncFunctionDef) -> None:
         """Don't descend into nested async functions."""
-        pass
 
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+    def visit_ClassDef(self, _node: ast.ClassDef) -> None:
         """Don't descend into nested classes."""
-        pass
+    # pylint: enable=invalid-name
 
 
 def count_asserts(function_node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
@@ -71,8 +71,6 @@ def is_test_function(name: str) -> bool:
 
 def is_test_file(path: str) -> bool:
     """Check if a file path indicates a pytest test file."""
-    import os
-
     basename = os.path.basename(path)
     return basename.startswith("test_") or basename.endswith("_test.py")
 
@@ -102,6 +100,7 @@ class TestFunctionFinder(ast.NodeVisitor):
                 )
             )
 
+    # pylint: disable=invalid-name
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         """Visit a function definition."""
         self._check_function(node)
@@ -116,6 +115,7 @@ class TestFunctionFinder(ast.NodeVisitor):
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit a class definition to find test methods."""
         self.generic_visit(node)
+    # pylint: enable=invalid-name
 
 
 def scan_file(path: str, content: str) -> list[Finding]:
