@@ -1,567 +1,374 @@
-"""Integration tests for the CLI with real files."""
-
 from __future__ import annotations
 
 import importlib
-import os
-import stat
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from test.samples import (
+    ASYNC_TEST,
+    BARE_CONTEXT_MANAGER,
+    CLASS_METHOD,
+    CLEAN,
+    HELPER_AND_TEST,
+    NESTED_CLASS,
+    NESTED_FUNCTION,
+    NON_PYTEST_WITH,
+    NO_ASSERTS,
+    NO_ASSERTS_TWICE,
+    OTHER_MODULE_RAISES,
+    OTHER_PYTEST_CONTEXT_MANAGER,
+    PYTEST_RAISES,
+    PYTEST_WARNS,
+    RAISES_PLUS_ASSERT,
+)
 from unittest.mock import patch
 
 import pytest
 
 from assert_one_assert_per_pytest.scanner import iter_test_functions
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+RunCli = Callable[[list[str]], tuple[int, str, str]]
+MakeFile = Callable[[str, str], Path]
+
+ITER_SOURCE = "def test_a():\n    assert True\n\ndef helper():\n    pass\n"
 
 
 @pytest.mark.integration
 class TestCliExitCodes:
-    """Tests for CLI exit codes."""
-
     def test_exit_0_no_findings(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """Exit code 0 when all tests have exactly one assert."""
-        path = test_file(
-            """
-def test_example():
-    assert True
-""",
-            "test_clean.py",
-        )
-        exit_code, _, _ = run_cli([str(path)])
-        assert exit_code == 0
+        path = test_file(CLEAN, "test_clean.py")
+        assert run_cli([str(path)])[0] == 0
 
     def test_exit_1_with_findings(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """Exit code 1 when findings exist."""
-        path = test_file(
-            """
-def test_no_asserts():
-    pass
-""",
-            "test_violation.py",
-        )
-        exit_code, _, _ = run_cli([str(path)])
-        assert exit_code == 1
+        path = test_file(NO_ASSERTS, "test_violation.py")
+        assert run_cli([str(path)])[0] == 1
 
-    def test_exit_2_missing_file(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-    ) -> None:
-        """Exit code 2 when file doesn't exist."""
-        exit_code, _, stderr = run_cli(["nonexistent.py"])
-        assert exit_code == 2
-        assert "not found" in stderr.lower()
+    def test_exit_2_missing_file(self, run_cli: RunCli) -> None:
+        assert run_cli(["nonexistent.py"])[0] == 2
+
+    def test_missing_file_is_reported(self, run_cli: RunCli) -> None:
+        assert "not found" in run_cli(["nonexistent.py"])[2].lower()
 
     def test_warn_only_always_exit_0(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """--warn-only always exits with 0."""
-        path = test_file(
-            """
-def test_no_asserts():
-    pass
-""",
-            "test_violation.py",
-        )
-        exit_code, _, _ = run_cli([str(path), "--warn-only"])
-        assert exit_code == 0
+        path = test_file(NO_ASSERTS, "test_violation.py")
+        assert run_cli([str(path), "--warn-only"])[0] == 0
 
 
 @pytest.mark.integration
 class TestCliOutput:
-    """Tests for CLI output formats."""
+    def test_default_output_is_one_line(self, default_output: str) -> None:
+        assert len(default_output.split("\n")) == 1
 
-    def test_default_output_format(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+    def test_default_output_has_four_fields(
+        self, default_output_parts: list[str]
     ) -> None:
-        """Default output shows path:line:name:count."""
-        path = test_file(
-            """
-def test_no_asserts():
-    pass
-""",
-            "test_example.py",
-        )
-        _, stdout, _ = run_cli([str(path)])
-        lines = stdout.strip().split("\n")
-        assert len(lines) == 1
-        parts = lines[0].split(":")
-        assert len(parts) == 4
-        assert "test_example.py" in parts[0]
-        assert parts[2] == "test_no_asserts"
-        assert parts[3] == "0"
+        assert len(default_output_parts) == 4
 
-    def test_count_output(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+    def test_default_output_starts_with_path(
+        self, default_output_parts: list[str]
     ) -> None:
-        """--count outputs only the count."""
-        path = test_file(
-            """
-def test_no_asserts():
-    pass
+        assert "test_example.py" in default_output_parts[0]
 
-def test_also_no_asserts():
-    x = 1
-""",
-            "test_example.py",
-        )
-        _, stdout, _ = run_cli([str(path), "--count"])
-        assert stdout.strip() == "2"
+    def test_default_output_names_the_function(
+        self, default_output_parts: list[str]
+    ) -> None:
+        assert default_output_parts[2] == "test_no_asserts"
+
+    def test_default_output_reports_the_count(
+        self, default_output_parts: list[str]
+    ) -> None:
+        assert default_output_parts[3] == "0"
+
+    def test_count_output(self, run_cli: RunCli, test_file: MakeFile) -> None:
+        path = test_file(NO_ASSERTS_TWICE, "test_example.py")
+        assert run_cli([str(path), "--count"])[1].strip() == "2"
 
     def test_quiet_no_output(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """--quiet produces no stdout output."""
-        path = test_file(
-            """
-def test_no_asserts():
-    pass
-""",
-            "test_example.py",
-        )
-        exit_code, stdout, _ = run_cli([str(path), "--quiet"])
-        assert stdout == ""
-        assert exit_code == 1
+        path = test_file(NO_ASSERTS, "test_example.py")
+        assert run_cli([str(path), "--quiet"])[1] == ""
+
+    def test_quiet_still_exits_1(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(NO_ASSERTS, "test_example.py")
+        assert run_cli([str(path), "--quiet"])[0] == 1
 
 
 @pytest.mark.integration
 class TestCliFileDiscovery:
-    """Tests for file discovery and filtering."""
-
     def test_scans_directory_recursively(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """Scans directories recursively for test files."""
         subdir = tmp_path / "subdir"
         subdir.mkdir()
+        (tmp_path / "test_root.py").write_text("def test_root():\n    pass\n")
+        (subdir / "test_nested.py").write_text("def test_nested():\n    pass\n")
+        assert run_cli([str(tmp_path), "--count"])[1].strip() == "2"
 
-        (tmp_path / "test_root.py").write_text(
-            """
-def test_root():
-    pass
-"""
-        )
-        (subdir / "test_nested.py").write_text(
-            """
-def test_nested():
-    pass
-"""
-        )
-
-        _, stdout, _ = run_cli([str(tmp_path), "--count"])
-        assert stdout.strip() == "2"
-
-    def test_exclude_patterns(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
-    ) -> None:
-        """--exclude filters out matching files."""
-        (tmp_path / "test_include.py").write_text(
-            """
-def test_included():
-    pass
-"""
-        )
-        (tmp_path / "test_exclude.py").write_text(
-            """
-def test_excluded():
-    pass
-"""
-        )
-
-        _, stdout, _ = run_cli(
+    def test_exclude_patterns(self, run_cli: RunCli, tmp_path: Path) -> None:
+        (tmp_path / "test_include.py").write_text("def test_i():\n    pass\n")
+        (tmp_path / "test_exclude.py").write_text("def test_e():\n    pass\n")
+        stdout = run_cli(
             [str(tmp_path), "--exclude", "**/test_exclude.py", "--count"]
-        )
+        )[1]
         assert stdout.strip() == "1"
 
     def test_ignores_non_test_files(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """Only scans test_*.py and *_test.py files."""
-        (tmp_path / "test_valid.py").write_text(
-            """
-def test_valid():
-    pass
-"""
-        )
-        (tmp_path / "helper.py").write_text(
-            """
-def test_in_helper():
-    pass
-"""
-        )
+        (tmp_path / "test_valid.py").write_text("def test_valid():\n    pass\n")
+        (tmp_path / "helper.py").write_text("def test_in_helper():\n    pass\n")
+        assert run_cli([str(tmp_path), "--count"])[1].strip() == "1"
 
-        _, stdout, _ = run_cli([str(tmp_path), "--count"])
-        assert stdout.strip() == "1"
+    def test_ignores_non_python_files_in_a_directory(
+        self, run_cli: RunCli, tmp_path: Path
+    ) -> None:
+        (tmp_path / "test_valid.py").write_text("def test_valid():\n    pass\n")
+        (tmp_path / "notes.txt").write_text("not python")
+        assert run_cli([str(tmp_path), "--count"])[1].strip() == "1"
 
     def test_exclude_matches_filename(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """Exclude patterns match by filename."""
         (tmp_path / "test_keep.py").write_text("def test_k():\n    pass\n")
         (tmp_path / "test_skip.py").write_text("def test_s():\n    pass\n")
-        _, stdout, _ = run_cli([str(tmp_path), "--exclude", "test_skip.py", "--count"])
+        stdout = run_cli(
+            [str(tmp_path), "--exclude", "test_skip.py", "--count"]
+        )[1]
         assert stdout.strip() == "1"
 
 
 @pytest.mark.integration
 class TestCliFailFast:
-    """Tests for --fail-fast behavior."""
-
     def test_stops_after_first_finding(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """--fail-fast stops after first finding."""
-        (tmp_path / "test_a.py").write_text(
-            """
-def test_a():
-    pass
-"""
-        )
-        (tmp_path / "test_b.py").write_text(
-            """
-def test_b():
-    pass
-"""
-        )
+        (tmp_path / "test_a.py").write_text("def test_a():\n    pass\n")
+        (tmp_path / "test_b.py").write_text("def test_b():\n    pass\n")
+        assert run_cli([str(tmp_path), "--fail-fast"])[0] == 1
 
-        exit_code, _, _ = run_cli([str(tmp_path), "--fail-fast"])
-        assert exit_code == 1
+    def test_returns_exit_code_1(self, run_cli: RunCli, tmp_path: Path) -> None:
+        (tmp_path / "test_single.py").write_text("def test_s():\n    pass\n")
+        assert run_cli([str(tmp_path), "--fail-fast"])[0] == 1
 
-    def test_returns_exit_code_1(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+    def test_reports_only_the_first_finding(
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """--fail-fast returns exit code 1 on finding."""
-        (tmp_path / "test_single.py").write_text(
-            """
-def test_single():
-    pass
-"""
-        )
-
-        exit_code, stdout, _ = run_cli([str(tmp_path), "--fail-fast"])
-        assert exit_code == 1
-        lines = [line for line in stdout.strip().split("\n") if line]
-        assert len(lines) == 1
+        (tmp_path / "test_single.py").write_text("def test_s():\n    pass\n")
+        stdout = run_cli([str(tmp_path), "--fail-fast"])[1]
+        assert len([ln for ln in stdout.strip().split("\n") if ln]) == 1
 
 
 @pytest.mark.integration
 class TestCliVerbose:
-    """Tests for --verbose output."""
-
     def test_verbose_shows_scanning_info(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """--verbose shows scanning progress."""
         path = test_file("def test_x():\n    assert True\n", "test_v.py")
-        _, stdout, _ = run_cli([str(path), "--verbose"])
-        assert "Scanning" in stdout
-        assert "Files scanned:" in stdout
+        assert "Scanning" in run_cli([str(path), "--verbose"])[1]
+
+    def test_verbose_shows_files_scanned(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file("def test_x():\n    assert True\n", "test_v.py")
+        assert "Files scanned:" in run_cli([str(path), "--verbose"])[1]
 
     def test_verbose_shows_exclude_patterns(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """--verbose shows exclude patterns."""
         (tmp_path / "test_x.py").write_text("def test_x():\n    assert True\n")
-        _, stdout, _ = run_cli(
+        stdout = run_cli(
             [str(tmp_path), "--verbose", "--exclude", "conftest.py"]
-        )
+        )[1]
         assert "Excluding patterns:" in stdout
 
     def test_verbose_shows_findings(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """--verbose shows individual findings."""
         path = test_file("def test_x():\n    pass\n", "test_v.py")
-        _, stdout, _ = run_cli([str(path), "--verbose"])
-        assert "Found:" in stdout
+        assert "Found:" in run_cli([str(path), "--verbose"])[1]
 
     def test_verbose_shows_skipped_excluded(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """--verbose shows skipped excluded files."""
         (tmp_path / "test_a.py").write_text("def test_a():\n    assert True\n")
         (tmp_path / "test_b.py").write_text("def test_b():\n    assert True\n")
-        _, stdout, _ = run_cli(
+        stdout = run_cli(
             [str(tmp_path), "--verbose", "--exclude", "test_b.py"]
-        )
+        )[1]
         assert "Skipping (excluded):" in stdout
 
     def test_verbose_shows_errors(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """--verbose shows errors occurred message."""
         (tmp_path / "test_ok.py").write_text("def test_ok():\n    assert True\n")
-        exit_code, stdout, _ = run_cli([str(tmp_path), "missing.py", "--verbose"])
+        stdout = run_cli([str(tmp_path), "missing.py", "--verbose"])[1]
         assert "Errors occurred" in stdout
-        assert exit_code == 2
+
+    def test_verbose_run_with_errors_exits_2(
+        self, run_cli: RunCli, tmp_path: Path
+    ) -> None:
+        (tmp_path / "test_ok.py").write_text("def test_ok():\n    assert True\n")
+        assert run_cli([str(tmp_path), "missing.py", "--verbose"])[0] == 2
 
 
 @pytest.mark.integration
 class TestCliErrorsAndGlobs:
-    """Tests for error handling and glob patterns."""
+    def test_syntax_error_exits_2(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file("def test_broken( invalid", "test_broken.py")
+        assert run_cli([str(path)])[0] == 2
 
     def test_syntax_error_reports_error(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """Syntax errors are reported."""
         path = test_file("def test_broken( invalid", "test_broken.py")
-        exit_code, _, stderr = run_cli([str(path)])
-        assert exit_code == 2
-        assert "syntax" in stderr.lower()
+        assert "syntax" in run_cli([str(path)])[2].lower()
 
     def test_glob_expands_to_directories(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """Glob patterns expand to include directories."""
         subdir = tmp_path / "tests"
         subdir.mkdir()
         (subdir / "test_a.py").write_text("def test_a():\n    pass\n")
-        _, stdout, _ = run_cli([f"{tmp_path}/*", "--count"])
-        assert stdout.strip() == "1"
+        assert run_cli([f"{tmp_path}/*", "--count"])[1].strip() == "1"
+
+    @pytest.mark.usefixtures("broken_symlink")
+    def test_glob_ignores_broken_symlinks(
+        self, run_cli: RunCli, tmp_path: Path
+    ) -> None:
+        (tmp_path / "test_real.py").write_text("def test_r():\n    pass\n")
+        assert run_cli([f"{tmp_path}/test_*.py", "--count"])[1].strip() == "1"
 
     def test_deduplicates_files(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """Duplicate file references are deduplicated."""
         path = test_file("def test_x():\n    pass\n", "test_dup.py")
-        _, stdout, _ = run_cli([str(path), str(path), "--count"])
-        assert stdout.strip() == "1"
+        assert run_cli([str(path), str(path), "--count"])[1].strip() == "1"
 
 
 @pytest.mark.integration
 class TestScannerIntegration:
-    """Tests for scanner integration."""
-
     def test_ignores_nested_function_asserts(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """Asserts in nested functions are not counted."""
-        path = test_file(
-            """
-def test_with_nested():
-    def helper():
-        assert False
-    assert True
-""",
-            "test_nested.py",
-        )
-        exit_code, _, _ = run_cli([str(path)])
-        assert exit_code == 0
+        path = test_file(NESTED_FUNCTION, "test_nested.py")
+        assert run_cli([str(path)])[0] == 0
 
     def test_ignores_nested_class_asserts(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """Asserts in nested classes are not counted."""
-        path = test_file(
-            """
-def test_with_nested_class():
-    class Helper:
-        def check(self):
-            assert False
-    assert True
-""",
-            "test_nested_class.py",
-        )
-        exit_code, _, _ = run_cli([str(path)])
-        assert exit_code == 0
+        path = test_file(NESTED_CLASS, "test_nested_class.py")
+        assert run_cli([str(path)])[0] == 0
 
     def test_detects_async_test_functions(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """Async test functions are detected."""
-        path = test_file("async def test_async():\n    pass\n", "test_async.py")
-        exit_code, stdout, _ = run_cli([str(path)])
-        assert exit_code == 1
-        assert "test_async" in stdout
+        path = test_file(ASYNC_TEST, "test_async.py")
+        assert run_cli([str(path)])[0] == 1
+
+    def test_names_the_async_test_function(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(ASYNC_TEST, "test_async.py")
+        assert "test_async" in run_cli([str(path)])[1]
 
     def test_detects_class_test_methods(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """Test methods in classes are detected."""
-        path = test_file(
-            """
-class TestClass:
-    def test_method(self):
-        pass
-""",
-            "test_class.py",
-        )
-        exit_code, stdout, _ = run_cli([str(path)])
-        assert exit_code == 1
-        assert "test_method" in stdout
+        path = test_file(CLASS_METHOD, "test_class.py")
+        assert run_cli([str(path)])[0] == 1
+
+    def test_names_the_class_test_method(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(CLASS_METHOD, "test_class.py")
+        assert "test_method" in run_cli([str(path)])[1]
 
     def test_ignores_non_test_functions(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """Non-test functions are ignored."""
-        path = test_file(
-            """
-def helper():
-    pass
+        path = test_file(HELPER_AND_TEST, "test_helper.py")
+        assert run_cli([str(path)])[0] == 0
 
-def test_only():
-    assert True
-""",
-            "test_helper.py",
-        )
-        exit_code, _, _ = run_cli([str(path)])
-        assert exit_code == 0
+    def test_iter_test_functions_yields_one_result(self) -> None:
+        assert len(list(iter_test_functions("test.py", ITER_SOURCE))) == 1
 
-    def test_iter_test_functions_integration(self) -> None:
-        """Test iter_test_functions yields correct data."""
-        code = "def test_a():\n    assert True\n\ndef helper():\n    pass\n"
-        results = list(iter_test_functions("test.py", code))
-        assert len(results) == 1
+    def test_iter_test_functions_names_the_function(self) -> None:
+        results = list(iter_test_functions("test.py", ITER_SOURCE))
         assert results[0][0] == "test_a"
 
     def test_pytest_raises_counts_as_assertion(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """pytest.raises() context manager counts as an assertion."""
-        path = test_file(
-            """
-import pytest
-
-def test_raises_exception():
-    with pytest.raises(ValueError):
-        raise ValueError("expected")
-""",
-            "test_raises.py",
-        )
-        exit_code, _, _ = run_cli([str(path)])
-        assert exit_code == 0
+        path = test_file(PYTEST_RAISES, "test_raises.py")
+        assert run_cli([str(path)])[0] == 0
 
     def test_pytest_warns_counts_as_assertion(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """pytest.warns() context manager counts as an assertion."""
-        path = test_file(
-            """
-import pytest
+        path = test_file(PYTEST_WARNS, "test_warns.py")
+        assert run_cli([str(path)])[0] == 0
 
-def test_warns_user():
-    with pytest.warns(UserWarning):
-        import warnings
-        warnings.warn("expected", UserWarning)
-""",
-            "test_warns.py",
-        )
-        exit_code, _, _ = run_cli([str(path)])
-        assert exit_code == 0
-
-    def test_pytest_raises_plus_assert_is_two_assertions(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+    def test_pytest_raises_plus_assert_exits_1(
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """pytest.raises() plus assert statement counts as two assertions."""
-        path = test_file(
-            """
-import pytest
+        path = test_file(RAISES_PLUS_ASSERT, "test_two.py")
+        assert run_cli([str(path)])[0] == 1
 
-def test_two_assertions():
-    with pytest.raises(ValueError):
-        raise ValueError("expected")
-    assert True
-""",
-            "test_two.py",
-        )
-        exit_code, stdout, _ = run_cli([str(path)])
-        assert exit_code == 1
-        assert "test_two_assertions" in stdout
-        assert ":2" in stdout
+    def test_pytest_raises_plus_assert_counts_two(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(RAISES_PLUS_ASSERT, "test_two.py")
+        assert ":2" in run_cli([str(path)])[1]
 
     def test_non_pytest_context_manager_not_counted(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        test_file: Callable[[str, str], Path],
+        self, run_cli: RunCli, test_file: MakeFile
     ) -> None:
-        """Non-pytest context managers don't count as assertions."""
-        path = test_file(
-            """
-def test_with_open():
-    with open(__file__) as f:
-        pass
-    assert True
-""",
-            "test_open.py",
-        )
-        exit_code, _, _ = run_cli([str(path)])
-        assert exit_code == 0
+        path = test_file(NON_PYTEST_WITH, "test_open.py")
+        assert run_cli([str(path)])[0] == 0
+
+    def test_context_manager_that_is_not_a_call_not_counted(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(BARE_CONTEXT_MANAGER, "test_bare.py")
+        assert run_cli([str(path)])[0] == 0
+
+    def test_other_pytest_context_manager_not_counted(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(OTHER_PYTEST_CONTEXT_MANAGER, "test_deprecated.py")
+        assert run_cli([str(path)])[0] == 0
+
+    def test_raises_on_another_module_not_counted(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(OTHER_MODULE_RAISES, "test_other.py")
+        assert run_cli([str(path)])[0] == 0
 
 
 @pytest.mark.integration
 class TestMainModuleAndEdgeCases:
-    """Tests for __main__ module and edge cases."""
-
     def test_main_module_runs(self, tmp_path: Path) -> None:
-        """Test running as python -m module."""
-        test_file = tmp_path / "test_main.py"
-        test_file.write_text("def test_x():\n    assert True\n")
+        path = tmp_path / "test_main.py"
+        path.write_text("def test_x():\n    assert True\n")
         result = subprocess.run(
-            [sys.executable, "-m", "assert_one_assert_per_pytest", str(test_file)],
+            [
+                sys.executable,
+                "-m",
+                "assert_one_assert_per_pytest",
+                str(path),
+            ],
             capture_output=True,
             text=True,
             check=False,
@@ -569,96 +376,70 @@ class TestMainModuleAndEdgeCases:
         assert result.returncode == 0
 
     def test_main_module_import(self) -> None:
-        """Test that __main__ module can be imported and calls main."""
         sys.modules.pop("assert_one_assert_per_pytest.__main__", None)
         with patch("assert_one_assert_per_pytest.cli.main") as mock_main:
             importlib.import_module("assert_one_assert_per_pytest.__main__")
             assert mock_main.called
 
     def test_glob_matching_directory(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """Glob matches directory and expands it."""
         subdir = tmp_path / "subdir"
         subdir.mkdir()
         (subdir / "test_in_sub.py").write_text("def test_x():\n    pass\n")
-        _, stdout, _ = run_cli([f"{tmp_path}/sub*", "--count"])
-        assert stdout.strip() == "1"
+        assert run_cli([f"{tmp_path}/sub*", "--count"])[1].strip() == "1"
 
     def test_duplicate_via_different_paths(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """Duplicates via different path forms are deduplicated."""
-        test_file = tmp_path / "test_x.py"
-        test_file.write_text("def test_x():\n    pass\n")
-        path1 = str(test_file)
-        path2 = str(tmp_path / "." / "test_x.py")
-        _, stdout, _ = run_cli([path1, path2, "--count"])
-        assert stdout.strip() == "1"
+        path = tmp_path / "test_x.py"
+        path.write_text("def test_x():\n    pass\n")
+        other = str(tmp_path / "." / "test_x.py")
+        assert run_cli([str(path), other, "--count"])[1].strip() == "1"
 
-    def test_glob_no_matches(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+    def test_glob_no_matches_exits_2(
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """Glob pattern with no matches reports error."""
-        exit_code, _, stderr = run_cli([f"{tmp_path}/nonexistent_*.py"])
-        assert exit_code == 2
+        assert run_cli([f"{tmp_path}/nonexistent_*.py"])[0] == 2
+
+    def test_glob_no_matches_reports_not_found(
+        self, run_cli: RunCli, tmp_path: Path
+    ) -> None:
+        stderr = run_cli([f"{tmp_path}/nonexistent_*.py"])[2]
         assert "not found" in stderr.lower()
 
     def test_glob_matching_file_directly(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """Glob matching a file directly works."""
-        test_file = tmp_path / "test_glob.py"
-        test_file.write_text("def test_g():\n    pass\n")
-        _, stdout, _ = run_cli([f"{tmp_path}/test_*.py", "--count"])
-        assert stdout.strip() == "1"
+        (tmp_path / "test_glob.py").write_text("def test_g():\n    pass\n")
+        assert run_cli([f"{tmp_path}/test_*.py", "--count"])[1].strip() == "1"
 
     def test_skips_non_python_files(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """Non-.py files passed directly are skipped."""
-        txt_file = tmp_path / "test_file.txt"
-        txt_file.write_text("not python")
-        test_file = tmp_path / "test_real.py"
-        test_file.write_text("def test_r():\n    pass\n")
-        _, stdout, _ = run_cli([str(txt_file), str(test_file), "--count"])
+        txt = tmp_path / "test_file.txt"
+        txt.write_text("not python")
+        real = tmp_path / "test_real.py"
+        real.write_text("def test_r():\n    pass\n")
+        stdout = run_cli([str(txt), str(real), "--count"])[1]
         assert stdout.strip() == "1"
 
     def test_skips_non_test_python_files(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+        self, run_cli: RunCli, tmp_path: Path
     ) -> None:
-        """Non-test .py files passed directly are skipped."""
         helper = tmp_path / "helper.py"
         helper.write_text("def helper():\n    pass\n")
-        test_file = tmp_path / "test_real.py"
-        test_file.write_text("def test_r():\n    pass\n")
-        _, stdout, _ = run_cli([str(helper), str(test_file), "--count"])
+        real = tmp_path / "test_real.py"
+        real.write_text("def test_r():\n    pass\n")
+        stdout = run_cli([str(helper), str(real), "--count"])[1]
         assert stdout.strip() == "1"
 
-    def test_unreadable_file(
-        self,
-        run_cli: Callable[[list[str]], tuple[int, str, str]],
-        tmp_path: Path,
+    def test_unreadable_file_exits_2(
+        self, run_cli: RunCli, unreadable_file: Path
     ) -> None:
-        """Unreadable files are reported as errors."""
-        test_file = tmp_path / "test_unreadable.py"
-        test_file.write_text("def test_u():\n    pass\n")
-        os.chmod(test_file, 0o000)
-        try:
-            exit_code, _, stderr = run_cli([str(test_file)])
-            assert exit_code == 2
-            assert "error" in stderr.lower()
-        finally:
-            os.chmod(test_file, stat.S_IRUSR | stat.S_IWUSR)
+        assert run_cli([str(unreadable_file)])[0] == 2
+
+    def test_unreadable_file_is_reported(
+        self, run_cli: RunCli, unreadable_file: Path
+    ) -> None:
+        assert "error" in run_cli([str(unreadable_file)])[2].lower()
