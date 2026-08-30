@@ -8,8 +8,19 @@ from test.samples import (
     BARE_RAISES,
     CLASS_METHOD,
     CLEAN,
+    COMPARISON_CHAIN,
+    CONJUNCTION,
+    CONJUNCTION_INSIDE_COMPREHENSION,
+    CONJUNCTION_INSIDE_DISJUNCTION,
+    CONJUNCTION_IN_MESSAGE,
+    CONJUNCTION_IN_NESTED_FUNCTION,
+    CONJUNCTION_OF_THREE,
+    CONJUNCTION_PLUS_ASSERT,
+    CONJUNCTION_WITH_MESSAGE,
+    DISJUNCTION,
     HELPER_AND_TEST,
     MIXED_VIOLATIONS,
+    NEGATED_CONJUNCTION,
     NESTED_CLASS,
     NESTED_FUNCTION,
     NON_PYTEST_WITH,
@@ -22,6 +33,7 @@ from test.samples import (
     RAISES_PLUS_ASSERT,
     THREE_ASSERTS,
     TWO_ASSERTS,
+    TWO_CONJUNCTIONS,
     TWO_TEST_FUNCTIONS,
 )
 
@@ -30,6 +42,7 @@ import pytest
 from assert_one_assert_per_pytest.scanner import (
     Finding,
     count_asserts,
+    find_conjunctions,
     is_test_file,
     is_test_function,
     iter_test_functions,
@@ -188,3 +201,88 @@ class TestIterTestFunctions:
     def test_yields_async_function_name(self) -> None:
         results = list(iter_test_functions(PATH, ASYNC_TEST_WITH_ASSERT))
         assert results[0][0] == "test_async"
+
+
+@pytest.mark.unit
+class TestFindConjunctions:
+    def test_finds_a_top_level_conjunction(self) -> None:
+        assert find_conjunctions(parse_function(CONJUNCTION)) == [(3, 2)]
+
+    def test_counts_every_conjunct_in_a_chain(self) -> None:
+        node = parse_function(CONJUNCTION_OF_THREE)
+        assert find_conjunctions(node) == [(3, 3)]
+
+    def test_finds_a_conjunction_carrying_a_message(self) -> None:
+        node = parse_function(CONJUNCTION_WITH_MESSAGE)
+        assert find_conjunctions(node) == [(3, 2)]
+
+    def test_finds_every_conjunction_in_a_function(self) -> None:
+        node = parse_function(TWO_CONJUNCTIONS)
+        assert find_conjunctions(node) == [(3, 2), (4, 2)]
+
+    def test_allows_a_disjunction(self) -> None:
+        assert len(find_conjunctions(parse_function(DISJUNCTION))) == 0
+
+    def test_allows_a_negated_conjunction(self) -> None:
+        node = parse_function(NEGATED_CONJUNCTION)
+        assert len(find_conjunctions(node)) == 0
+
+    def test_allows_a_conjunction_inside_a_disjunction(self) -> None:
+        node = parse_function(CONJUNCTION_INSIDE_DISJUNCTION)
+        assert len(find_conjunctions(node)) == 0
+
+    def test_allows_a_conjunction_inside_a_comprehension(self) -> None:
+        node = parse_function(CONJUNCTION_INSIDE_COMPREHENSION)
+        assert len(find_conjunctions(node)) == 0
+
+    def test_allows_a_comparison_chain(self) -> None:
+        assert len(find_conjunctions(parse_function(COMPARISON_CHAIN))) == 0
+
+    def test_allows_and_inside_a_message_string(self) -> None:
+        node = parse_function(CONJUNCTION_IN_MESSAGE)
+        assert len(find_conjunctions(node)) == 0
+
+    def test_ignores_a_conjunction_in_a_nested_function(self) -> None:
+        node = parse_function(CONJUNCTION_IN_NESTED_FUNCTION)
+        assert len(find_conjunctions(node)) == 0
+
+    def test_finds_nothing_in_a_single_plain_assert(self) -> None:
+        assert len(find_conjunctions(parse_function(CLEAN))) == 0
+
+
+@pytest.mark.unit
+class TestScanFileConjunctions:
+    def test_reports_a_conjunction(self) -> None:
+        assert len(scan_file(PATH, CONJUNCTION)) == 1
+
+    def test_reports_nothing_for_a_disjunction(self) -> None:
+        assert len(scan_file(PATH, DISJUNCTION)) == 0
+
+    def test_marks_the_finding_as_a_conjunction(self) -> None:
+        assert scan_file(PATH, CONJUNCTION)[0].conjunction is True
+
+    def test_reports_the_number_of_conjuncts(self) -> None:
+        assert scan_file(PATH, CONJUNCTION_OF_THREE)[0].assert_count == 3
+
+    def test_reports_the_line_of_the_assert(self) -> None:
+        assert scan_file(PATH, CONJUNCTION)[0].line_number == 3
+
+    def test_reports_the_enclosing_function(self) -> None:
+        finding = scan_file(PATH, CONJUNCTION)[0]
+        assert finding.function_name == "test_conjunction"
+
+    def test_reports_both_kinds_of_finding(self) -> None:
+        assert len(scan_file(PATH, CONJUNCTION_PLUS_ASSERT)) == 2
+
+    def test_reports_the_assert_count_finding_first(self) -> None:
+        assert scan_file(PATH, CONJUNCTION_PLUS_ASSERT)[0].conjunction is False
+
+
+@pytest.mark.unit
+class TestConjunctionFinding:
+    def test_str_appends_the_conjunction_marker(self) -> None:
+        finding = Finding(PATH, 10, "test_something", 2, conjunction=True)
+        assert str(finding) == "test_example.py:10:test_something:2:conjunction"
+
+    def test_conjunction_defaults_to_false(self) -> None:
+        assert Finding(PATH, 10, "test_something", 0).conjunction is False

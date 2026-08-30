@@ -70,9 +70,14 @@ Default output shows one finding per line:
 ```text
 path/to/test_file.py:10:test_example:0
 path/to/test_file.py:25:test_another:3
+path/to/test_file.py:31:test_third:2:conjunction
 ```
 
 Format: `file_path:line_number:function_name:assert_count`
+
+A conjunction finding adds a fifth field, `conjunction`. Its line number is the
+`assert` statement rather than the enclosing function, and its count is the
+number of conjuncts the expression joins.
 
 ## Exit Codes
 
@@ -92,6 +97,34 @@ It does **not** count:
 
 - Assertions in nested functions or classes
 - Helper assertions in fixtures or utility functions
+
+## Conjunctions
+
+An `assert` whose test expression is a top-level `and` carries one claim per
+conjunct, so a red run names the whole expression rather than the claim that
+broke. The tool reports it the way it reports a second `assert`.
+
+```python
+def test_bucket():
+    assert "bucket_name" in result and "bucket_arn" in result
+```
+
+Only a top-level `and` is refused. These are all allowed:
+
+- `assert a or b`, one claim about two alternatives. Splitting it into two
+  tests would assert something stronger than the author meant.
+- `assert 0 < x < 10`, a comparison chain, which is one claim about one value
+  whatever the length of the chain.
+- `assert not (a and b)`, which is `not a or not b`, and so a disjunction.
+- `assert (a and b) or c`, where the claim being made is the disjunction.
+- `assert all(i.a and i.b for i in items)`, where the `and` is evaluated per
+  item inside a comprehension rather than joining two claims about the test.
+- `assert a, "b and c"`, where the `and` is inside a string.
+
+A short-circuit guard is refused along with the rest, because nothing in the
+expression distinguishes a guard from a claim. Drop the guard and let the
+failure speak for itself: `assert len(blocks) == 1` raises on `None` and names
+the line, where `assert blocks is not None and len(blocks) == 1` does not.
 
 ## Options
 

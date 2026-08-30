@@ -5,6 +5,9 @@ from test.helpers import run_tool
 from test.samples import (
     ASYNC_TEST,
     CLASS_METHOD,
+    CONJUNCTION,
+    CONJUNCTION_OF_THREE,
+    DISJUNCTION,
     HELPER_AND_TEST,
     NESTED_FUNCTION,
     NO_ASSERTS,
@@ -264,3 +267,25 @@ class TestEdgeCases:
         path.write_text("\ndef test_example():\n    pass\n")
         result = run_tool(str(path), str(path), "--count")
         assert result.stdout.strip() == "1"
+
+
+@pytest.mark.e2e
+class TestConjunctions:
+    def test_exit_1_when_an_assert_joins_two_claims(
+        self, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "test_conjunction.py"
+        path.write_text(CONJUNCTION)
+        assert run_tool(str(path)).returncode == 1
+
+    def test_exit_0_when_an_assert_offers_alternatives(
+        self, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "test_disjunction.py"
+        path.write_text(DISJUNCTION)
+        assert run_tool(str(path)).returncode == 0
+
+    def test_output_marks_the_conjunction(self, tmp_path: Path) -> None:
+        path = tmp_path / "test_conjunction.py"
+        path.write_text(CONJUNCTION_OF_THREE)
+        assert run_tool(str(path)).stdout.strip().endswith(":3:conjunction")

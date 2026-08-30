@@ -10,6 +10,10 @@ from test.samples import (
     BARE_CONTEXT_MANAGER,
     CLASS_METHOD,
     CLEAN,
+    CONJUNCTION,
+    CONJUNCTION_OF_THREE,
+    CONJUNCTION_PLUS_ASSERT,
+    DISJUNCTION,
     HELPER_AND_TEST,
     NESTED_CLASS,
     NESTED_FUNCTION,
@@ -443,3 +447,42 @@ class TestMainModuleAndEdgeCases:
         self, run_cli: RunCli, unreadable_file: Path
     ) -> None:
         assert "error" in run_cli([str(unreadable_file)])[2].lower()
+
+
+@pytest.mark.integration
+class TestCliConjunctions:
+    def test_exit_1_for_a_conjunction(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(CONJUNCTION, "test_conjunction.py")
+        assert run_cli([str(path)])[0] == 1
+
+    def test_exit_0_for_a_disjunction(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(DISJUNCTION, "test_disjunction.py")
+        assert run_cli([str(path)])[0] == 0
+
+    def test_output_marks_the_conjunction(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(CONJUNCTION, "test_conjunction.py")
+        assert run_cli([str(path)])[1].strip().endswith(":conjunction")
+
+    def test_output_names_the_number_of_conjuncts(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(CONJUNCTION_OF_THREE, "test_conjunction.py")
+        assert ":3:conjunction" in run_cli([str(path)])[1]
+
+    def test_count_mode_counts_both_kinds(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(CONJUNCTION_PLUS_ASSERT, "test_both.py")
+        assert run_cli([str(path), "--count"])[1].strip() == "2"
+
+    def test_verbose_reports_the_conjunction(
+        self, run_cli: RunCli, test_file: MakeFile
+    ) -> None:
+        path = test_file(CONJUNCTION, "test_conjunction.py")
+        assert "conjunction" in run_cli([str(path), "--verbose"])[1]

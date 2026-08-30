@@ -157,3 +157,67 @@ def test_multiple():
     assert True
     assert False
 """
+
+CONJUNCTION = """
+def test_conjunction():
+    assert True and False
+"""
+
+CONJUNCTION_OF_THREE = """
+def test_three_conjuncts():
+    assert True and False and True
+"""
+
+CONJUNCTION_WITH_MESSAGE = """
+def test_conjunction_with_message():
+    assert True and False, "message"
+"""
+
+DISJUNCTION = """
+def test_disjunction():
+    assert True or False
+"""
+
+NEGATED_CONJUNCTION = """
+def test_negated_conjunction():
+    assert not (True and False)
+"""
+
+CONJUNCTION_INSIDE_DISJUNCTION = """
+def test_conjunction_inside_disjunction():
+    assert (True and False) or True
+"""
+
+CONJUNCTION_INSIDE_COMPREHENSION = """
+def test_conjunction_inside_comprehension():
+    assert all(item.a and item.b for item in items)
+"""
+
+COMPARISON_CHAIN = """
+def test_comparison_chain():
+    assert 0 < value < 10
+"""
+
+CONJUNCTION_IN_MESSAGE = """
+def test_conjunction_in_message():
+    assert value, "expected a and b"
+"""
+
+CONJUNCTION_IN_NESTED_FUNCTION = """
+def test_conjunction_in_nested_function():
+    def helper():
+        assert True and False
+    assert True
+"""
+
+CONJUNCTION_PLUS_ASSERT = """
+def test_conjunction_plus_assert():
+    assert True and False
+    assert True
+"""
+
+TWO_CONJUNCTIONS = """
+def test_two_conjunctions():
+    assert True and False
+    assert False and True
+"""
