@@ -5,7 +5,9 @@ from test.samples import (
     ASYNC_TEST,
     ASYNC_TEST_WITH_ASSERT,
     BARE_CONTEXT_MANAGER,
+    BARE_FIXTURE,
     BARE_RAISES,
+    CALLED_FIXTURE,
     CLASS_METHOD,
     CLEAN,
     COMPARISON_CHAIN,
@@ -19,6 +21,8 @@ from test.samples import (
     CONJUNCTION_WITH_MESSAGE,
     DISJUNCTION,
     HELPER_AND_TEST,
+    IMPORTED_FIXTURE,
+    MARKED_TEST,
     MIXED_VIOLATIONS,
     NEGATED_CONJUNCTION,
     NESTED_CLASS,
@@ -43,7 +47,7 @@ from assert_one_assert_per_pytest.scanner import (
     Finding,
     count_asserts,
     find_conjunctions,
-    is_test_file,
+    is_pytest_fixture,
     is_test_function,
     iter_test_functions,
     scan_file,
@@ -71,21 +75,33 @@ class TestIsTestFunction:
 
 
 @pytest.mark.unit
-class TestIsTestFile:
-    def test_returns_true_for_test_prefix(self) -> None:
-        assert is_test_file("test_example.py") is True
+class TestIsPytestFixture:
+    def test_returns_true_for_bare_decorator(self) -> None:
+        assert is_pytest_fixture(parse_function(BARE_FIXTURE)) is True
 
-    def test_returns_true_for_test_suffix(self) -> None:
-        assert is_test_file("example_test.py") is True
+    def test_returns_true_for_called_decorator(self) -> None:
+        assert is_pytest_fixture(parse_function(CALLED_FIXTURE)) is True
 
-    def test_returns_true_for_path_with_test_prefix(self) -> None:
-        assert is_test_file("tests/unit/test_example.py") is True
+    def test_returns_true_for_imported_decorator(self) -> None:
+        assert is_pytest_fixture(parse_function(IMPORTED_FIXTURE)) is True
 
-    def test_returns_false_for_non_test_file(self) -> None:
-        assert is_test_file("example.py") is False
+    def test_returns_false_for_a_mark(self) -> None:
+        assert is_pytest_fixture(parse_function(MARKED_TEST)) is False
 
-    def test_returns_false_for_conftest(self) -> None:
-        assert is_test_file("conftest.py") is False
+    def test_returns_false_for_an_undecorated_test(self) -> None:
+        assert is_pytest_fixture(parse_function(CLEAN)) is False
+
+
+@pytest.mark.unit
+class TestFixturesAreNotTests:
+    def test_bare_fixture_yields_no_finding(self) -> None:
+        assert scan_file(PATH, BARE_FIXTURE) == []
+
+    def test_called_fixture_yields_no_finding(self) -> None:
+        assert scan_file(PATH, CALLED_FIXTURE) == []
+
+    def test_fixture_is_not_iterated(self) -> None:
+        assert list(iter_test_functions(PATH, BARE_FIXTURE)) == []
 
 
 @pytest.mark.unit

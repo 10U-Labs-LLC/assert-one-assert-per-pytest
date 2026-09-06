@@ -221,3 +221,27 @@ def test_two_conjunctions():
     assert True and False
     assert False and True
 """
+
+BARE_FIXTURE = """
+@pytest.fixture
+def test_device_id():
+    return "e2e-test-device"
+"""
+
+CALLED_FIXTURE = """
+@pytest.fixture(scope="module")
+def test_session_id():
+    return "e2e-test-session"
+"""
+
+IMPORTED_FIXTURE = """
+@fixture
+def test_client():
+    return object()
+"""
+
+MARKED_TEST = """
+@pytest.mark.unit
+def test_marked():
+    assert True
+"""

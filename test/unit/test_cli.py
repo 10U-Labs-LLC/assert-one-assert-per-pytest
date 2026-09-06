@@ -122,9 +122,9 @@ class TestExpandDirectory:
         (tmp_path / "example_test.py").write_text("")
         assert len(_expand_directory(str(tmp_path))) == 1
 
-    def test_ignores_non_test_files(self, tmp_path: Path) -> None:
+    def test_finds_non_test_named_files(self, tmp_path: Path) -> None:
         (tmp_path / "helper.py").write_text("")
-        assert len(_expand_directory(str(tmp_path))) == 0
+        assert len(_expand_directory(str(tmp_path))) == 1
 
     def test_ignores_non_python_files(self, tmp_path: Path) -> None:
         (tmp_path / "notes.txt").write_text("")

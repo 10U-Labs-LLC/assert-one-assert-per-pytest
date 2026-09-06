@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .scanner import Finding, is_test_file, scan_file
+from .scanner import Finding, scan_file
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -37,7 +37,7 @@ def create_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         help=(
             "One or more file paths, directory paths, or glob patterns to scan. "
-            "Directories are scanned recursively for test files (test_*.py, *_test.py)."
+            "Directories are scanned recursively for Python files."
         ),
     )
 
@@ -107,9 +107,7 @@ def _expand_directory(directory: str) -> list[str]:
 
         for filename in filenames:
             if filename.endswith(".py"):
-                filepath = os.path.join(root, filename)
-                if is_test_file(filepath):
-                    files.append(filepath)
+                files.append(os.path.join(root, filename))
     return files
 
 
@@ -166,9 +164,6 @@ def process_files(
 
     for path in sorted(files):
         if not path.endswith(".py"):
-            continue
-
-        if not is_test_file(path):
             continue
 
         if _should_skip_file(path, exclude_patterns):

@@ -126,12 +126,12 @@ class TestCliFileDiscovery:
         )[1]
         assert stdout.strip() == "1"
 
-    def test_ignores_non_test_files(
+    def test_scans_non_test_named_files(
         self, run_cli: RunCli, tmp_path: Path
     ) -> None:
         (tmp_path / "test_valid.py").write_text("def test_valid():\n    pass\n")
         (tmp_path / "helper.py").write_text("def test_in_helper():\n    pass\n")
-        assert run_cli([str(tmp_path), "--count"])[1].strip() == "1"
+        assert run_cli([str(tmp_path), "--count"])[1].strip() == "2"
 
     def test_ignores_non_python_files_in_a_directory(
         self, run_cli: RunCli, tmp_path: Path
@@ -428,15 +428,15 @@ class TestMainModuleAndEdgeCases:
         stdout = run_cli([str(txt), str(real), "--count"])[1]
         assert stdout.strip() == "1"
 
-    def test_skips_non_test_python_files(
+    def test_scans_a_named_non_test_python_file(
         self, run_cli: RunCli, tmp_path: Path
     ) -> None:
         helper = tmp_path / "helper.py"
-        helper.write_text("def helper():\n    pass\n")
+        helper.write_text("def test_in_helper():\n    pass\n")
         real = tmp_path / "test_real.py"
         real.write_text("def test_r():\n    pass\n")
         stdout = run_cli([str(helper), str(real), "--count"])[1]
-        assert stdout.strip() == "1"
+        assert stdout.strip() == "2"
 
     def test_unreadable_file_exits_2(
         self, run_cli: RunCli, unreadable_file: Path

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -89,9 +88,16 @@ def is_test_function(name: str) -> bool:
     return name.startswith("test_")
 
 
-def is_test_file(path: str) -> bool:
-    basename = os.path.basename(path)
-    return basename.startswith("test_") or basename.endswith("_test.py")
+def is_pytest_fixture(
+    function_node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> bool:
+    for decorator in function_node.decorator_list:
+        func = decorator.func if isinstance(decorator, ast.Call) else decorator
+        if isinstance(func, ast.Attribute) and func.attr == "fixture":
+            return True
+        if isinstance(func, ast.Name) and func.id == "fixture":
+            return True
+    return False
 
 
 class TestFunctionFinder(ast.NodeVisitor):
@@ -119,7 +125,7 @@ class TestFunctionFinder(ast.NodeVisitor):
     def _check_function(
         self, node: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> None:
-        if not is_test_function(node.name):
+        if not is_test_function(node.name) or is_pytest_fixture(node):
             return
 
         assert_count = count_asserts(node)
@@ -149,6 +155,6 @@ def iter_test_functions(
 
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if is_test_function(node.name):
+            if is_test_function(node.name) and not is_pytest_fixture(node):
                 assert_count = count_asserts(node)
                 yield (node.name, node.lineno, assert_count)

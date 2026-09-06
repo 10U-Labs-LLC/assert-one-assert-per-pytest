@@ -113,7 +113,7 @@ class TestFileDiscovery:
         )
         assert run_tool(str(tmp_path), "--count").stdout.strip() == "2"
 
-    def test_only_scans_test_files(self, tmp_path: Path) -> None:
+    def test_scans_every_python_file(self, tmp_path: Path) -> None:
         (tmp_path / "test_valid.py").write_text(
             "\ndef test_valid():\n    pass\n"
         )
@@ -123,7 +123,7 @@ class TestFileDiscovery:
         (tmp_path / "conftest.py").write_text(
             "\ndef test_in_conftest():\n    pass\n"
         )
-        assert run_tool(str(tmp_path), "--count").stdout.strip() == "1"
+        assert run_tool(str(tmp_path), "--count").stdout.strip() == "3"
 
     def test_exclude_patterns(self, tmp_path: Path) -> None:
         (tmp_path / "test_include.py").write_text(

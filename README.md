@@ -29,7 +29,7 @@ pip install assert-one-assert-per-pytest
 assert-one-assert-per-pytest test_example.py
 
 # Scan directories recursively
-assert-one-assert-per-pytest tests/
+assert-one-assert-per-pytest tests/ src/
 
 # Use glob patterns
 assert-one-assert-per-pytest "tests/**/test_*.py"
@@ -84,6 +84,25 @@ number of conjuncts the expression joins.
 - `0`: No findings (or `--warn-only` specified)
 - `1`: Findings detected
 - `2`: Error (missing files, syntax errors, etc.)
+
+## What Counts as a Test?
+
+A test is any function whose name starts with `test_` and which is not
+decorated as a pytest fixture. The file it lives in does not matter: a
+directory argument is walked for every `.py` file it holds, dotted directories
+aside, and each one is read.
+
+Filename is not a proxy for content. A `test_*` function defined in
+`base_classes.py` or in a factory module is inherited into a suite and run by
+pytest exactly like one written in `test_thing.py`, so the rule applies to it
+the same way. Selecting on the filename would leave those functions unchecked
+while reporting a clean run.
+
+A function carrying `@pytest.fixture`, bare or called, is skipped whatever it
+is named. `test_device_id` decorated as a fixture supplies a value to tests; it
+is not one.
+
+Use `--exclude` to drop files you do not want read.
 
 ## What Counts as an Assert?
 
